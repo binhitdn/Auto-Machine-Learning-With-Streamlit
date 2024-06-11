@@ -1,7 +1,10 @@
 streamlit
-streamlit-option-menu
 pandas
-numpy
-pycaret
-streamlit_pandas_profiling
+scikit-learn
+matplotlib
+seaborn
+streamlit-option-menu
+pandas-profiling
+streamlit-pandas-profiling
+altair
 ydata-profiling
