@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
 import numpy as np
-
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 from sklearn.metrics import confusion_matrix
 
 st.title("Machine Learning")
@@ -92,7 +93,7 @@ def hoi_quy(df):
             y_data = df[Y]  # Chọn biến phụ thuộc
             
             # Lựa chọn loại hồi quy
-            regression_type = st.radio("Chọn loại hồi quy:", ("Linear Regression", "Logistic Regression", "KNN", "Decision Tree"))
+            regression_type = st.radio("Chọn loại hồi quy:", ("Linear Regression", "Logistic Regression", "KNN", "Decision Tree","Random Forest","SVM"))
             
             if regression_type == "Linear Regression":
                 # Train the linear regression model
@@ -123,18 +124,18 @@ def hoi_quy(df):
             
             elif regression_type == "Logistic Regression":
                 # Train the logistic regression model
-                model = LogisticRegression()
+                model = LogisticRegression(C=0.1, penalty='l2')
                 model.fit(X_data, y_data)
-    
+
                 # Make predictions
                 y_pred = model.predict(X_data)
-    
+
                 # Model evaluation
                 accuracy = accuracy_score(y_data, y_pred)
-    
+
                 # Display results
                 st.write(f"Accuracy: {accuracy}")
-    
+
                 # Plotting (if applicable)
                 # Plot confusion matrix
                 cm = confusion_matrix(y_data, y_pred)
@@ -145,7 +146,7 @@ def hoi_quy(df):
                 results_df = pd.DataFrame({'Actual': y_data, 'Predicted': y_pred})
                 st.write("Predicted vs Actual:")
                 st.write(results_df)
-    
+
                 # Plot confusion matrix as heatmap
                 plt.figure(figsize=(8, 6))
                 sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
@@ -213,7 +214,44 @@ def hoi_quy(df):
                     plt.figure(figsize=(20, 10))
                     plot_tree(model, filled=True, feature_names=X.columns.tolist(), class_names=y.unique().tolist())
                     st.pyplot(plt)
-                
+            elif regression_type == "Random Forest":
+                model = RandomForestClassifier()
+                model.fit(X_data, y_data)
+                y_pred = model.predict(X_data)
+                accuracy = accuracy_score(y_data, y_pred)
+                st.write(f"Accuracy: {accuracy}")
+                cm = confusion_matrix(y_data, y_pred)
+                st.write("Confusion Matrix:")
+                st.write(cm)
+                results_df = pd.DataFrame({'Actual': y_data, 'Predicted': y_pred})
+                st.write("Predicted vs Actual:")
+                st.write(results_df)
+                plt.figure(figsize=(8, 6))
+                sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
+                plt.xlabel("Predicted")
+                plt.ylabel("Actual")
+                plt.title("Confusion Matrix")
+                st.pyplot()
+
+            elif regression_type == "SVM":
+                model = SVC()
+                model.fit(X_data, y_data)
+                y_pred = model.predict(X_data)
+                accuracy = accuracy_score(y_data, y_pred)
+                st.write(f"Accuracy: {accuracy}")
+                cm = confusion_matrix(y_data, y_pred)
+                st.write("Confusion Matrix:")
+                st.write(cm)
+                results_df = pd.DataFrame({'Actual': y_data, 'Predicted': y_pred})
+                st.write("Predicted vs Actual:")
+                st.write(results_df)
+                plt.figure(figsize=(8, 6))
+                sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
+                plt.xlabel("Predicted")
+                plt.ylabel("Actual")
+                plt.title("Confusion Matrix")
+                st.pyplot()
+
             else:
                 st.warning("Vui lòng chọn ít nhất một biến độc lập và một biến phụ thuộc.")
         else:
