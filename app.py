@@ -1,300 +1,466 @@
-from sklearn.linear_model import LinearRegression
 import streamlit as st
 import pandas as pd
+from ydata_profiling import ProfileReport
+from streamlit_option_menu import option_menu
+from streamlit_pandas_profiling import st_profile_report
+import os
+import warnings
+warnings.filterwarnings("ignore")
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import mean_squared_error, r2_score, accuracy_score, classification_report,roc_curve, roc_auc_score
+from sklearn.neighbors import KNeighborsClassifier
+
+
+from sklearn.tree import DecisionTreeClassifier, plot_tree
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, confusion_matrix, mean_squared_error, r2_score
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
-
-if 'file' not in st.session_state:
-    st.session_state.file = None
-if 'columns' not in st.session_state:
-    st.session_state.columns = []
-if 'df' not in st.session_state:
-    st.session_state.df = None
-
-# Page layout
-st.set_page_config(page_title="Data Analysis App", layout="wide")
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import confusion_matrix
+from sklearn.cluster import KMeans
 
 
-st.title("Data Analysis App")
+st.title("Machine Learning")
+st.write("Trước tiên hãy up file lên")
+st.write("Chọn một tùy chọn từ thanh bên trái")
+st.set_option('deprecation.showPyplotGlobalUse', False)
 
-select_file = st.sidebar.file_uploader("SELECT FILE")
-if select_file is not None:
-    st.session_state.file = select_file.getvalue()
+css_style = {
+    "icon": {"color": "black"},
+    "icon_selected": {"color": "white"},
+    "nav-link": {"--hover-color": "grey"},
+    "nav-link-selected": {"background-color": "#FF4C1B", "color": "white", "font-weight": "400"},
+}
 
-button = st.sidebar.button("Đọc file")
+if os.path.exists("sourcedata.csv"):
+    df = pd.read_csv("sourcedata.csv", index_col=None)
+    st.session_state.df = df
+    st.session_state.columns = df.columns.tolist()
 
-if button:
-    if st.session_state.file is not None:
-        if select_file.name.endswith('.csv'):
-            df = pd.read_csv(select_file)
-            st.session_state.df = df  
-            st.session_state.columns = df.columns.tolist()
-        elif select_file.name.endswith('.xlsx'):
-            df = pd.read_excel(select_file)
-            st.session_state.df = df  
-            st.session_state.columns = df.columns.tolist()
+auto_url = "./images/AUTOML.png"
+
+def upload_page(df):
+    st.subheader("TẢI LÊN DỮ LIỆU CỦA BẠN ")
+    st.info("Trong phần này, người dùng có thể tải lên tập dữ liệu của mình để phân tích và xây dựng mô hình học máy tự động.")
+    data = st.file_uploader("Vui lòng tải lên tập dữ liệu của bạn ở đây")
+    if data:
+        df = pd.read_csv(data, index_col=None)
+        df.to_csv("sourcedata.csv", index=None)
+        st.dataframe(df)
+
+def trang_phan_tich(df):
+    st.subheader("Phân Tích Dữ Liệu")
+    st.info("Trong phần này, ứng dụng thực hiện một phân tích dữ liệu tự động trên dữ liệu. Điều này giúp người dùng hiểu biết và nắm bắt dữ liệu của mình hơn")
+    st.info("GHI CHÚ: Nếu không có dữ liệu được tải lên ở Trang Tải Lên Dữ Liệu, trang này sẽ hiển thị một thông báo lỗi.")
+    
+    st.write("Thông tin cơ bản về dữ liệu:")
+    st.write(df.info())
+
+    st.write("Mô tả thống kê cơ bản:")
+    st.write(df.describe())
+    
+    st.write("Mối quan hệ giữa các biến:")
+    sns.pairplot(df)
+    st.pyplot()
+    
+    # Phân tích phân phối của các biến
+    st.write("Phân phối của các biến:")
+    for column in df.columns:
+        plt.figure(figsize=(8, 6))
+        sns.histplot(df[column], kde=True)
+        plt.title(f"Distribution of {column}")
+        plt.xlabel(column)
+        plt.ylabel("Frequency")
+        st.pyplot()
+   # Tạo báo cáo phân tích dữ liệu
+    profile = ProfileReport(df, explorative=True)
+    st_profile_report(profile)
+
+
+                
+def hoi_quy(df):
+    st.subheader("MÔ HÌNH DỰ ĐOÁN")
+    st.info("Trong phần này, người dùng có thể xây dựng mô hình học máy để dự đoán giá trị của một biến phụ thuộc dựa trên các biến độc lập.")
+    st.info("GHI CHÚ: Nếu không có dữ liệu được tải lên ở Trang Tải Lên Dữ Liệu, trang này sẽ hiển thị một thông báo lỗi.")
+
+    if df is not None:
+        regression_type = st.radio("Chọn loại Mô Hình Dự Đoán:", ("Linear Regression", "Logistic Regression", "KNN", "Decision Tree", "Random Forest", "SVM", "Kmeans"))
+        Y = st.selectbox("Chọn biến phụ thuộc (Y)", df.columns)
+        X = st.multiselect("Chọn biến độc lập (X)", df.columns)
+        
+        if X and Y:
+            X_data = df[X] 
+            y_data = df[Y]  
+            
+            if regression_type == "Linear Regression":
+                model = LinearRegression()
+                model.fit(X_data, y_data)
+
+                y_pred = model.predict(X_data)
+
+                mse = mean_squared_error(y_data, y_pred)
+                r_squared = r2_score(y_data, y_pred)
+
+                st.write(f"Mean Squared Error: {mse}")
+                st.write(f"R-squared: {r_squared}")
+
+                plt.figure(figsize=(10, 6))
+                plt.scatter(y_data, y_pred, color='blue', label='Actual vs Predicted')
+                plt.plot(y_data, y_data, color='red', label='Perfect prediction') 
+                plt.xlabel('Actual')
+                plt.ylabel('Predicted')
+                plt.title('Linear Regression - Actual vs Predicted')
+                plt.legend()
+                st.pyplot(plt)
+
+            elif regression_type == "Logistic Regression":
+                model = LogisticRegression(C=0.1, penalty='l2')
+                model.fit(X_data, y_data)
+
+                y_pred = model.predict(X_data)
+
+                accuracy = accuracy_score(y_data, y_pred)
+
+                st.write(f"Accuracy: {accuracy}")
+
+                cm = confusion_matrix(y_data, y_pred)
+                st.write("Confusion Matrix:")
+                st.write(cm)
+
+                results_df = pd.DataFrame({'Actual': y_data, 'Predicted': y_pred})
+                st.write("Predicted vs Actual:")
+                st.write(results_df)
+
+                plt.figure(figsize=(8, 6))
+                sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=True)
+                plt.xlabel("Predicted")
+                plt.ylabel("Actual")
+                plt.title("Confusion Matrix")
+                st.pyplot()
+
+            elif regression_type == "KNN":
+                model = KNeighborsClassifier()
+                model.fit(X_data, y_data)
+
+                y_pred = model.predict(X_data)
+
+                accuracy = accuracy_score(y_data, y_pred)
+
+                st.write(f"Accuracy: {accuracy}")
+
+                cm = confusion_matrix(y_data, y_pred)
+                st.write("Confusion Matrix:")
+                st.write(cm)
+
+                results_df = pd.DataFrame({'Actual': y_data, 'Predicted': y_pred})
+                st.write("Predicted vs Actual:")
+                st.write(results_df)
+
+                plt.figure(figsize=(8, 6))
+                sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=True)
+                plt.xlabel("Predicted")
+                plt.ylabel("Actual")
+                plt.title("Confusion Matrix")
+                st.pyplot()
+
+            elif regression_type == "Decision Tree":
+                max_depth = st.slider("Chọn độ sâu tối đa của cây", 1, 20, 5)
+                min_samples_split = st.slider("Số lượng mẫu tối thiểu để tách nút", 2, 20, 2)
+                min_samples_leaf = st.slider("Số lượng mẫu tối thiểu tại một lá", 1, 20, 1)
+                
+                if st.button("Dự đoán"):
+                    X = df[X]
+                    y = df[Y]
+    
+                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+                    model = DecisionTreeClassifier(max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf)
+                    model.fit(X_train, y_train)
+    
+                    y_pred = model.predict(X_test)
+    
+                    st.subheader("Kết quả dự đoán")
+                    result_df = pd.DataFrame({"Thực tế": y_test, "Dự đoán": y_pred})
+                    st.write(result_df)
+    
+                  
+                    plt.figure(figsize=(20, 10))
+                    plot_tree(model, filled=True, feature_names=X.columns.tolist(), class_names=y.unique().tolist())
+                    st.pyplot(plt)
+                    
+            elif regression_type == "Random Forest":
+                n_estimators = st.slider("Chọn số lượng cây (n_estimators)", 10, 200, 100)
+                max_depth = st.slider("Chọn độ sâu tối đa của cây", 1, 20, 5)
+                min_samples_split = st.slider("Số lượng mẫu tối thiểu để tách nút", 2, 20, 2)
+                min_samples_leaf = st.slider("Số lượng mẫu tối thiểu tại một lá", 1, 20, 1)
+
+                if st.button("Dự đoán"):
+                    X_train, X_test, y_train, y_test = train_test_split(X_data, y_data, test_size=0.2, random_state=42)
+
+                    model = RandomForestClassifier(
+                        n_estimators=n_estimators,
+                        max_depth=max_depth,
+                        min_samples_split=min_samples_split,
+                        min_samples_leaf=min_samples_leaf,
+                        random_state=0
+                    )
+                    model.fit(X_train, y_train)
+
+                    y_pred = model.predict(X_test)
+
+                    st.subheader("Kết quả dự đoán")
+                    result_df = pd.DataFrame({"Thực tế": y_test, "Dự đoán": y_pred})
+                    st.write(result_df)
+
+                  
+                    cm = confusion_matrix(y_test, y_pred)
+                    st.write("Confusion Matrix:")
+                    st.write(cm)
+
+                    plt.figure(figsize=(8, 6))
+                    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=True)
+                    plt.xlabel("Predicted")
+                    plt.ylabel("Actual")
+                    plt.title("Confusion Matrix")
+                    st.pyplot()
+
+                  
+                    st.write("Classification Report:")
+                    st.text(str(classification_report(y_test, y_pred)))
+
+            elif regression_type == "SVM":
+                C = st.slider("Chọn tham số C", 0.01, 10.0, 1.0)
+                kernel = st.selectbox("Chọn kernel", ["linear", "poly", "rbf", "sigmoid"])
+                degree = st.slider("Chọn bậc đa thức (degree)", 1, 10, 3)
+                gamma = st.selectbox("Chọn gamma", ["scale", "auto"])
+
+                if st.button("Dự đoán"):
+                    X_train, X_test, y_train, y_test = train_test_split(X_data, y_data, test_size=0.2, random_state=42)
+
+                    model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma)
+                    model.fit(X_train, y_train)
+
+                    y_pred = model.predict(X_test)
+
+                    st.subheader("Kết quả dự đoán")
+                    result_df = pd.DataFrame({"Thực tế": y_test, "Dự đoán": y_pred})
+                    st.write(result_df)
+
+                 
+                    cm = confusion_matrix(y_test, y_pred)
+                    st.write("Confusion Matrix:")
+                    st.write(cm)
+
+                    plt.figure(figsize=(8, 6))
+                    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=True)
+                    plt.xlabel("Predicted")
+                    plt.ylabel("Actual")
+                    plt.title("Confusion Matrix")
+                    st.pyplot()
+
+                 
+                    st.write("Classification Report:")
+                    st.text(str(classification_report(y_test, y_pred)))
+                 
+            elif regression_type == "Kmeans":
+                k = st.slider("Chọn số lượng cụm (K)", 1, 10, 2)
+                if st.button("Dự đoán"):
+                    kmeans = KMeans(n_clusters=k)
+                    kmeans.fit(X_data)
+                    y_kmeans = kmeans.predict(X_data)
+                    centers = kmeans.cluster_centers_
+                    plt.scatter(X_data.iloc[:, 0], X_data.iloc[:, 1], c=y_kmeans, s=50, cmap='viridis')
+                    plt.scatter(centers[:, 0], centers[:, 1], c='black', s=200, alpha=0.5)
+                    plt.xlabel(X.columns[0])
+                    plt.ylabel(X.columns[1])
+                    plt.title('KMeans Clustering')
+                    st.pyplot(plt)
+  
+
+
+
+def handle_missing_data(df):
+    missing_cols = df.columns[df.isnull().any()].tolist()
+    st.write("Cột chứa dữ liệu bị thiếu:")
+    st.write(missing_cols)
+
+    
+    if st.button("Xóa dòng"):
+        df.dropna(axis=0, inplace=True)
+    
+    if st.button("Điền giá trị trung bình"):
+        for col in missing_cols:
+            if df[col].dtype == "object":
+                df[col].fillna(df[col].mode()[0], inplace=True)
+            else:
+                df[col].fillna(df[col].mean(), inplace=True)
+    
+    st.write("Dữ liệu sau khi xử lý dữ liệu bị thiếu:")
+    st.write(df)
+
+def handle_duplicates(df):
+    duplicate_rows = df[df.duplicated()]
+    st.write("Số lượng dòng trùng lặp:", duplicate_rows.shape[0])
+
+    if duplicate_rows.shape[0] > 0:
+        st.write("Dòng trùng lặp:")
+        st.write(duplicate_rows)
+
+    if st.button("Xóa dòng trùng lặp"):
+        df.drop_duplicates(inplace=True)
+    
+    st.write("Dữ liệu sau khi xử lý dữ liệu trùng lặp:")
+    st.write(df)
+
+def convert_data_type(df):
+    columns = df.columns.tolist()
+    selected_columns = st.multiselect("Chọn cột để đổi kiểu dữ liệu:", columns)
+
+    if selected_columns:
+        for col in selected_columns:
+            current_dtype = df[col].dtype
+            st.write(f"Kiểu dữ liệu hiện tại của cột '{col}': {current_dtype}")
+
+            new_dtype = st.selectbox(f"Chọn kiểu dữ liệu mới cho cột '{col}':", ["int", "float", "str", "datetime"])
+
+            if new_dtype == "int":
+                df[col] = df[col].astype(int)
+            elif new_dtype == "float":
+                df[col] = df[col].astype(float)
+            elif new_dtype == "str":
+                df[col] = df[col].astype(str)
+            elif new_dtype == "datetime":
+                df[col] = pd.to_datetime(df[col])
+
+    st.write("Dữ liệu sau khi đổi kiểu dữ liệu:")
+    st.write(df)
+
+def rename_columns(df):
+    old_columns = df.columns.tolist()
+    new_columns = []
+
+    for col in old_columns:
+        new_name = st.text_input(f"Nhập tên mới cho cột '{col}':", value=col)
+        new_columns.append(new_name)
+
+    df.columns = new_columns
+
+    st.write("Dữ liệu sau khi đổi tên các cột:")
+    st.write(df)
+
+def save_data(df):
+    file_format = st.selectbox("Chọn định dạng tệp:", ["csv", "xlsx"])
+    file_path = st.text_input("Nhập đường dẫn lưu trữ (để trống để lưu tại thư mục hiện tại):", value="")
+
+    if file_path:
+        file_name = st.text_input("Nhập tên tệp:", value=f"data_cleaned.{file_format}")
+        save_path = f"{file_path}/{file_name}"
     else:
-        st.warning('Vui lòng chọn dataset')
+        file_name = st.text_input("Nhập tên tệp:", value=f"data_cleaned.{file_format}")
+        save_path = file_name
 
-# Function to predict with selected algorithm
-def predict_with_algorithm(df, selected_variables, target_variable, selected_algorithm):
-    X = df[[var for var in selected_variables if var != target_variable]]
-    y = df[target_variable]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
-    # if selected_algorithm == "Logistic Regression":
-    #     model = LogisticRegression()
-    # elif selected_algorithm == "Linear Regression":
-    #     model = LinearRegression()
-    # elif selected_algorithm == "KNN":
-    #     model = KNeighborsClassifier(n_neighbors=5)
-    
-    # model.fit(X_train, y_train)
-    # y_pred = model.predict(X_test)
-    
-    # if selected_algorithm == "Logistic Regression":
-    #     st.subheader("Confusion Matrix")
-    #     conf_matrix = confusion_matrix(y_test, y_pred)
-    #     st.write(conf_matrix)
+    if st.button("Lưu dữ liệu"):
+        if file_format == "csv":
+            df.to_csv(save_path, index=False)
+            # download 
+            st.markdown(f'<a href="{save_path}" download="{file_name}">Click để tải tệp về</a>', unsafe_allow_html=True)
+        elif file_format == "xlsx":
+            df.to_excel(save_path, index=False)
+
+        st.success(f"Đã lưu dữ liệu vào tệp {save_path}")
+
+def phan_tich_va_lam_sach_du_lieu(df):
+    st.subheader("Phân Tích và Làm Sạch Dữ Liệu")
+
+    if df is not None:
+        st.write("Dữ liệu gốc:")
+        st.write(df)
+
+        handle_missing_data(df.copy())
+        handle_duplicates(df.copy())
+        convert_data_type(df.copy())
+        rename_columns(df.copy())
+        save_data(df.copy())
+
+    else:
+        st.warning("Vui lòng tải lên dữ liệu trước khi thực hiện phân tích và làm sạch dữ liệu.")
         
-    #     st.subheader("Accuracy")
-    #     accuracy = accuracy_score(y_test, y_pred)
-    #     st.write(accuracy)
-        
-    #     plt.figure(figsize=(6, 6))
-    #     sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
-    #     st.pyplot()
-        
-    # elif selected_algorithm == "Linear Regression":
-    #     mse = mean_squared_error(y_test, y_pred)
-    #     r2 = r2_score(y_test, y_pred)
-    #     st.write("Mean Squared Error:", mse)
-    #     st.write("R-squared:", r2)
-        
-    # elif selected_algorithm == "KNN":
-    #     accuracy = accuracy_score(y_test, y_pred)
-    #     st.write("Accuracy:", accuracy)
-    #     confusion_mat = confusion_matrix(y_test, y_pred)
-    #     st.write("Confusion Matrix:")
-    #     st.write(confusion_mat)
-    if selected_algorithm == "Logistic Regression":
-        model = LogisticRegression()
-    elif selected_algorithm == "Linear Regression":
-        model = LinearRegression()
-    elif selected_algorithm == "KNN":
-        model = KNeighborsClassifier(n_neighbors=5)
-    elif selected_algorithm == "Decision Tree":
-        model = DecisionTreeClassifier()
-    
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-    if selected_algorithm == "Logistic Regression":
-        st.subheader("Confusion Matrix")
-        conf_matrix = confusion_matrix(y_test, y_pred)
-        st.write(conf_matrix)
-        
-        st.subheader("Accuracy")
+# Thiết lập thanh menu lựa chọn (sidebar)
+with st.sidebar:
+    st.info("Abc")
+    selected = option_menu(
+        menu_title=None,
+        options=["Trang Tải Lên Dữ Liệu", "Trang Phân Tích Dữ Liệu", "Mô Hình Dự Đoán", "Phân Tích và Làm Sạch Dữ Liệu"],
+        icons=["cloud-upload", "clipboard-data", "cpu", "download", "calculator", "chart-line", "chart-bar"],
+        styles=css_style
+   )
+
+if selected == "Trang Tải Lên Dữ Liệu":
+    upload_page(df)
+
+elif selected == "Trang Phân Tích Dữ Liệu":
+    trang_phan_tich(df)
+
+elif selected == "Mô Hình Dự Đoán":
+    hoi_quy(df)
+
+elif selected == "Phân Tích và Làm Sạch Dữ Liệu":
+    phan_tich_va_lam_sach_du_lieu(df)
+    st.subheader("SVM Models")
+
+    models = {
+        "Default SVM (C=1.0, kernel=rbf, gamma=auto)": SVC(),
+        "SVM with RBF kernel and C=100.0": SVC(C=100.0),
+        "SVM with RBF kernel and C=1000.0": SVC(C=1000.0),
+        "SVM with linear kernel and C=1.0": SVC(kernel='linear', C=1.0),
+        "SVM with linear kernel and C=100.0": SVC(kernel='linear', C=100.0),
+        "SVM with linear kernel and C=1000.0": SVC(kernel='linear', C=1000.0),
+        "SVM with polynomial kernel and C=1.0": SVC(kernel='poly', C=1.0),
+        "SVM with polynomial kernel and C=100.0": SVC(kernel='poly', C=100.0),
+        "SVM with sigmoid kernel and C=1.0": SVC(kernel='sigmoid', C=1.0),
+        "SVM with sigmoid kernel and C=100.0": SVC(kernel='sigmoid', C=100.0),
+    }
+
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+
         accuracy = accuracy_score(y_test, y_pred)
-        st.write(accuracy)
-        
-        plt.figure(figsize=(6, 6))
-        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
-        st.pyplot()
-        
-    # elif selected_algorithm == "Linear Regression":
-    #     mse = mean_squared_error(y_test, y_pred)
-    #     r2 = r2_score(y_test, y_pred)
-    #     st.write("Mean Squared Error:", mse)
-    #     st.write("R-squared:", r2)
+        st.write(f"{name} - Accuracy: {accuracy:.4f}")
 
-    elif selected_algorithm == "Linear Regression":
-        mse = mean_squared_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
-        st.write("Mean Squared Error:", mse)
-        st.write("R-squared:", r2)
-        
-        # st.subheader("Confusion Matrix")
-        # conf_matrix = confusion_matrix(y_test, y_pred)
-        # st.write(conf_matrix)
-        
-    # elif selected_algorithm == "KNN":
-    #     accuracy = accuracy_score(y_test, y_pred)
-    #     st.write("Accuracy:", accuracy)
-    #     confusion_mat = confusion_matrix(y_test, y_pred)
-    #     st.write("Confusion Matrix:")
-    #     st.write(confusion_mat)
-    elif selected_algorithm == "KNN":
-        # accuracy = accuracy_score(y_test, y_pred)
-        # st.write("Accuracy:", accuracy)
-        st.subheader("Confusion Matrix")
-        conf_matrix = confusion_matrix(y_test, y_pred)
-        st.write(conf_matrix)
-        
-        st.subheader("Accuracy")
-        accuracy = accuracy_score(y_test, y_pred)
-        st.write(accuracy)
-        
-        plt.figure(figsize=(6, 6))
-        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
-        st.pyplot()
-    elif selected_algorithm == "Decision Tree":
-        st.subheader("Confusion Matrix")
-        conf_matrix = confusion_matrix(y_test, y_pred)
-        st.write(conf_matrix)
-        
-        st.subheader("Accuracy")
-        accuracy = accuracy_score(y_test, y_pred)
-        st.write(accuracy)
-        
-        plt.figure(figsize=(6, 6))
-        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
-        st.pyplot()
+        # Confusion Matrix
+        cm = confusion_matrix(y_test, y_pred)
+        st.write("Confusion Matrix:")
+        st.write(cm)
 
-def clean_data():  
-    st.header("CleanData")
-    if st.sidebar.button("Display"):
-        st.subheader("Display")
-        st.write(st.session_state.df) 
-    if st.sidebar.button("Display Null Counts"):
-        st.subheader("Null Counts")
-        null_counts = st.session_state.df.isnull().sum()
-        st.write(null_counts)
-    if st.sidebar.button("Delete Rows with Null"):
-        st.session_state.df.dropna(inplace=True)
-        st.success("All rows with null values have been deleted.")
-    selected_column = st.sidebar.selectbox("Choose column", st.session_state.columns)
-    if st.sidebar.button("Display Unique Values"):
-        st.subheader(f"Unique values in column '{selected_column}'")
-        unique_values = st.session_state.df[selected_column].unique()
-        st.write(unique_values)
-    if st.sidebar.button("Replace Null with Mode"):
-        mode_value = st.session_state.df[selected_column].mode()[0]
-        st.session_state.df[selected_column].fillna(mode_value, inplace=True)
-        st.success(f"Successfully replaced null values in column '{selected_column}' with mode.")
-    if st.sidebar.button("Replace Null with Mean"):
-        mean_value = st.session_state.df[selected_column].mean()
-        st.session_state.df[selected_column].fillna(mean_value, inplace=True)
-        st.success(f"Successfully replaced null values in column '{selected_column}' with mean.")
-    if st.sidebar.button("Delete Rows with Null of column"):
-        st.session_state.df.dropna(subset=[selected_column], inplace=True)
-        st.success(f"Rows with null values in column '{selected_column}' have been deleted.")
-    if st.sidebar.button("Delete Column"):
-        st.session_state.df.drop(labels=[selected_column],axis = 1, inplace=True)
-        st.success(f"Column '{selected_column}' has been deleted.")
-    replace_value = st.sidebar.text_input("Enter value to replace", "", key="replace_value_input")
-    numeric_value = st.sidebar.text_input("Enter numeric value", "", key="numeric_value_input")
-    if st.sidebar.button("Convert", key="convert_button"):
-        if replace_value == "":
-            st.warning("Please enter value to replace.")
-            return
-        if numeric_value == "":
-            st.warning("Please enter numeric value.")
-            return
-        replace_dict = {replace_value: float(numeric_value)}
-        st.session_state.df[selected_column].replace(replace_dict, inplace=True)
-        st.success(f"Categorical data in column '{selected_column}' converted to numeric.")
-    if st.sidebar.button("Histogram Chart"):
-        numeric_columns = st.session_state.df.select_dtypes(include=['int', 'float']).columns
-        fig, axes = plt.subplots(len(numeric_columns), 1, figsize=(8, len(numeric_columns) * 4))
-        for i, col in enumerate(numeric_columns):
-            st.session_state.df[col].hist(ax=axes[i])
-            axes[i].set_title(col)
-        st.pyplot(fig)
-    
-    if st.sidebar.button("Pie Chart of Column"):
-        value_counts = st.session_state.df[selected_column].value_counts(normalize=True)  
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.pie(value_counts, labels=value_counts.index, autopct='%1.1f%%', startangle=140)
-        ax.set_title(selected_column, fontsize=14)  # Điều chỉnh kích thước của tiêu đề
-        ax.axis('equal')  # Đảm bảo biểu đồ tròn
-        ax.legend(loc="right", fontsize=8)  # Thêm chú thích bên cạnh
-        ax.set_ylabel("")  # Xóa nhãn trục y
-        ax.tick_params(labelsize=8)  # Điều chỉnh cỡ chữ của tất cả trong biểu đồ
-        st.pyplot(fig)
-    if st.sidebar.button("Line Chart of Column"):
-        value_counts = st.session_state.df[selected_column].value_counts(normalize=True)
-        fig, ax = plt.subplots(figsize=(8, 6))
-        value_counts.plot(kind='line', ax=ax)
-        ax.set_title(selected_column, fontsize=14)  # Điều chỉnh kích thước của tiêu đề
-        ax.set_xlabel(selected_column)  # Đặt nhãn trục x là tên cột
-        ax.set_ylabel("Percentage")  # Đặt nhãn trục y
-        ax.tick_params(labelsize=8)  # Điều chỉnh cỡ chữ của tất cả trong biểu đồ
-        st.pyplot(fig)
-    if st.sidebar.button("Box plot of Column"):
-        q1, q3 = np.percentile(st.session_state.df[selected_column], [25, 75])
-        iqr = q3 - q1
-        lower_bound = q1 - (iqr)
-        upper_bound = q3 + (iqr)
-        clean_data = st.session_state.df[(st.session_state.df[selected_column] >= lower_bound) & (st.session_state.df[selected_column] <= upper_bound)]
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.boxplot(clean_data[selected_column], vert=False)
-        ax.set_title('Box plot')
-        # Thêm chú thích
-        ax.annotate(f'Min: {lower_bound:.2f}', xy=(lower_bound, 1), xytext=(lower_bound, 1.1), fontsize=10)
-        ax.annotate(f'Q1: {q1:.2f}', xy=(q1, 1), xytext=(q1, 1.1), fontsize=10)
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=True)
+        plt.xlabel("Predicted")
+        plt.ylabel("Actual")
+        plt.title(f"Confusion Matrix for {name}")
+        st.pyplot(plt)
 
-        ax.annotate(f'Q3: {q3:.2f}', xy=(q3, 1), xytext=(q3, 1.1), fontsize=10)
+        # Classification Report
+        st.write("Classification Report:")
+        st.text(classification_report(y_test, y_pred))
 
-        ax.annotate(f'Max: {upper_bound:.2f}', xy=(upper_bound, 1), xytext=(upper_bound, 1.1), fontsize=10)
+        # ROC Curve and AUC
+        if hasattr(model, "decision_function"):
+            y_score = model.decision_function(X_test)
+        else:
+            y_score = model.predict_proba(X_test)[:, 1]
 
-        st.pyplot(fig)
-    selected_2_variables = st.sidebar.multiselect("Select variables(1 or 2)", st.session_state.columns)
-    if st.sidebar.button("Bar Chart of 3 Column"):
-        df_gr = st.session_state.df.groupby(selected_column).agg({selected_2_variables[0]:'count', selected_2_variables[1]:'mean'}).reset_index()
-        df_gr = df_gr.sort_values(by=selected_2_variables[0])
-        ax = df_gr.plot(kind='bar', x=selected_column)
-        plt.grid()
-        st.pyplot(ax.figure)
-    if st.sidebar.button("Bar Chart of 2 Column"):
-        df_gr = st.session_state.df.groupby(selected_column).agg({ selected_2_variables[0]:'mean'}).reset_index()
-        df_gr = df_gr.sort_values(by=selected_2_variables[0])
-        ax = df_gr.plot(kind='bar', x=selected_column, y = selected_2_variables[0])
-        plt.grid()
-        st.pyplot(ax.figure)
-    if st.sidebar.button("Scatter Plot"):
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.scatter(st.session_state.df[selected_column], st.session_state.df[selected_2_variables[0]], color='purple', alpha=0.5)
-        ax.set_title('Scatter Plot')
-        ax.set_xlabel(selected_column)
-        ax.set_ylabel(selected_2_variables[0])
-        ax.grid(True)
-        st.pyplot(fig)
-    if st.sidebar.button("Save dataframe"):
-        # Chuyển DataFrame thành CSV
-        csv = st.session_state.df.to_csv(index=False)
-        # Tạo nút tải xuống cho CSV
-        st.download_button(
-            label="Download data as CSV",
-            data=csv,
-            file_name='dataframe_clean.csv',
-            mime='text/csv',
-        )
+        fpr, tpr, _ = roc_curve(y_test, y_score)
+        roc_auc = roc_auc_score(y_test, y_score)
 
+        plt.figure(figsize=(6, 4))
+        plt.plot(fpr, tpr, linewidth=2)
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.title(f"ROC Curve for {name}")
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        st.pyplot(plt)
 
-def training_data():
-    st.header("Huấn luyện mô hình")  
-    selected_column = st.sidebar.selectbox("Choose column", st.session_state.columns)
-    selected_algorithm = st.sidebar.selectbox("Choose algorithm", ["Logistic Regression", "Linear Regression", "KNN", "Decision Tree"])            
-    st.sidebar.subheader("Choose variables for prediction")
-    selected_variables = st.sidebar.multiselect("Select variables", st.session_state.columns)
-
-    if st.sidebar.button("Predict"):
-        predict_with_algorithm(st.session_state.df, selected_variables, selected_column, selected_algorithm)      
-
-def main():
-    menu = ["Clean Data", "Training Data"]
-    choice = st.sidebar.selectbox("Menu", menu)
-    if choice == "Clean Data":
-        clean_data()
-    elif choice == "Training Data":
-        training_data()
-
-
-if __name__ == "__main__":
-    main()
+        st.write(f"ROC AUC for {name}: {roc_auc:.4f}")
