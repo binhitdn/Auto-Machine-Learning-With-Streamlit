@@ -8,3 +8,4 @@ pandas-profiling
 streamlit-pandas-profiling
 altair
 ydata-profiling
+plotly
